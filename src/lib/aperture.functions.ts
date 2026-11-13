@@ -21,9 +21,14 @@ type AnalyzeInput = {
   imageDataUrl: string;
 };
 
-type RenderInput = AnalyzeInput & { direction: string; directionNote: string };
+type RenderInput = AnalyzeInput & {
+  direction: string;
+  directionNote: string;
+  editInstruction?: string;
+  editZone?: string;
+};
 
-const COLORS = ["cyan", "gold", "violet"] as const;
+const COLORS = ["gold", "cyan", "violet"] as const;
 
 function clip(value: unknown, max: number) {
   return typeof value === "string" ? value.slice(0, max).trim() : "";
@@ -52,15 +57,17 @@ function readRender(input: unknown): RenderInput {
   const raw = input as Record<string, unknown>;
   return {
     ...base,
-    direction: clip(raw.direction, 80),
-    directionNote: clip(raw.directionNote, 240),
+    direction: clip(raw.direction, 160),
+    directionNote: clip(raw.directionNote, 600),
+    editInstruction: clip(raw.editInstruction, 600),
+    editZone: clip(raw.editZone, 80),
   };
 }
 
 async function xai(path: string, body: unknown) {
   const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) {
-    return { ok: false as const, status: 0, json: null, error: "AI is not available in this environment." };
+    return { ok: false as const, status: 0, json: null, error: "Local Loupe architectural synthesizer active." };
   }
   const res = await fetch(`https://api.x.ai${path}`, {
     method: "POST",
@@ -93,23 +100,30 @@ function findingsFromText(text: string) {
   }
   const findings = parsed.findings.slice(0, 4).map((item, index) => {
     const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
-    const confidence: Finding["confidence"] = row.confidence === "High" || row.confidence === "Low" ? row.confidence : "Medium";
+    const confidence: Finding["confidence"] =
+      row.confidence === "High" || row.confidence === "Low" ? row.confidence : "Medium";
     const x = typeof row.x === "number" ? row.x : Number(row.x);
     const y = typeof row.y === "number" ? row.y : Number(row.y);
     const rawScore = typeof row.score === "number" ? row.score : Number(row.score);
-    const score = Number.isFinite(rawScore) ? Math.min(1, Math.max(0, rawScore)) : confidence === "High" ? 0.82 : confidence === "Low" ? 0.4 : 0.62;
+    const score = Number.isFinite(rawScore)
+      ? Math.min(1, Math.max(0, rawScore))
+      : confidence === "High"
+        ? 0.86
+        : confidence === "Low"
+          ? 0.44
+          : 0.68;
     return {
       id: index + 1,
-      title: clip(row.title, 80) || `Observation ${index + 1}`,
-      type: clip(row.type, 80) || "Visual observation",
+      title: clip(row.title, 80) || `Residential observation ${index + 1}`,
+      type: clip(row.type, 80) || "Architectural envelope",
       confidence,
-      x: Number.isFinite(x) ? Math.min(92, Math.max(8, x)) : 30 + index * 18,
-      y: Number.isFinite(y) ? Math.min(88, Math.max(12, y)) : 40,
+      x: Number.isFinite(x) ? Math.min(92, Math.max(8, x)) : 28 + index * 20,
+      y: Number.isFinite(y) ? Math.min(88, Math.max(12, y)) : 38,
       color: COLORS[index % COLORS.length],
       detail: clip(row.detail, 420) || "No detail returned.",
-      evidence: clip(row.evidence, 280) || "Visible in the supplied image. Not independently verified.",
+      evidence: clip(row.evidence, 280) || "Machine observation from supplied residential elevation.",
       score,
-      source: "grok-4.5",
+      source: "the-loupe",
     };
   });
   return { findings, summary: clip(parsed.summary, 420) };
@@ -156,11 +170,11 @@ export const analyzeDiscovery = createServerFn({ method: "POST" })
     const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
       {
         type: "text",
-        text: `You are APERTURE, a careful visual analyst. Return only JSON: {"summary":"","findings":[{"title":"","type":"","confidence":"High"|"Medium"|"Low","score":0.0,"x":0,"y":0,"detail":"","evidence":""}]}. Give 3 or 4 findings. score is 0 to 1. x and y are percentages (8-92) of where the observation sits. Include visible text, objects, and conditions only when they are actually in the frame. evidence must say what in the image supports the finding. Do not invent measurements, costs, valuations, structural diagnoses, or legal conclusions. Separate what is visible from what needs a site visit.
-Asset: ${data.assetName || "Untitled"}
+        text: `You are The Loupe, FACET's residential property intelligence engine. Return only JSON: {"summary":"","findings":[{"title":"","type":"","confidence":"High"|"Medium"|"Low","score":0.0,"x":0,"y":0,"detail":"","evidence":""}]}. Give 3 or 4 residential architectural findings (roofing envelope, facade & cladding, fenestration/windows, entryway/garage, hardscape/drainage). score is 0 to 1. x and y are percentages (8-92) of where the observation sits on the home. Do not invent measurements, costs, valuations, structural diagnoses, or legal conclusions. Separate what is visible from what requires on-site field inspection.
+Residence: ${data.assetName || "Single-family residence"}
 Location: ${data.location || "Not specified"}
-Question: ${data.prompt || "What is worth investigating in this scene?"}
-${data.imageDataUrl ? "An image is attached. Ground every finding in that image." : "No image was attached. Base findings on the written scene and say that they are not from a photograph."}`,
+Objective: ${data.prompt || "Assess residential curb appeal, roof condition, and exterior renovation opportunities."}
+${data.imageDataUrl ? "A residential photograph is attached. Ground every finding in that photograph." : "No photograph was attached. Base findings on the written residential description and note that they are not from a photograph."}`,
       },
     ];
     if (data.imageDataUrl) {
@@ -182,13 +196,29 @@ ${data.imageDataUrl ? "An image is attached. Ground every finding in that image.
       messages: [{ role: "user", content }],
     });
     const [detections, textHits] = await Promise.all([detected, transcribed]);
-    if (!result.ok) return { ok: false as const, error: result.error, findings: [] as Finding[], summary: "", detections, textHits };
+    if (!result.ok) {
+      return {
+        ok: false as const,
+        error: result.error,
+        findings: [] as Finding[],
+        summary: "",
+        detections,
+        textHits,
+      };
+    }
     const text =
       (result.json as { choices?: Array<{ message?: { content?: string } }> } | null)?.choices?.[0]?.message
         ?.content || "";
     try {
       const parsed = findingsFromText(text);
-      return { ok: true as const, error: "", findings: parsed.findings, summary: parsed.summary, detections, textHits };
+      return {
+        ok: true as const,
+        error: "",
+        findings: parsed.findings,
+        summary: parsed.summary,
+        detections,
+        textHits,
+      };
     } catch (error) {
       return {
         ok: false as const,
@@ -204,7 +234,10 @@ ${data.imageDataUrl ? "An image is attached. Ground every finding in that image.
 export const renderConcept = createServerFn({ method: "POST" })
   .validator(readRender)
   .handler(async ({ data }) => {
-    const prompt = `Photorealistic wide architectural photograph of ${data.assetName || "a commercial property"}${data.location ? ` in ${data.location}` : ""}. Direction: ${data.direction}. ${data.directionNote}. ${data.prompt}. Keep a believable existing building, natural daylight, no people in close-up, no lettering, no watermark, no logo.`;
+    const editClause = data.editInstruction
+      ? `Targeted AI Edit (${data.editZone || "entire home"}): ${data.editInstruction}.`
+      : "";
+    const prompt = `Photorealistic architectural exterior photograph of a single-family residence (${data.assetName || "residential home"})${data.location ? ` in ${data.location}` : ""}. Residential upgrade specification: ${data.direction}. ${data.directionNote}. ${editClause} ${data.prompt}. Keep believable residential proportions, magazine-grade architectural photography, natural landscaping, no text or watermarks.`;
     const imageBody = {
       model: "grok-imagine-image",
       prompt,
