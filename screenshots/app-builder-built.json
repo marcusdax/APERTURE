@@ -1,0 +1,38 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "APERTURE — Visual Intelligence",
+      "hasCanvas": false,
+      "bodyTextLen": 1457,
+      "bodyTextHash": "c10d9bd2821683581f01ef08b45cd9b2443959f1b6082fe0a9505d636067ed58",
+      "bodyTextPrefix": "APERTURE® VISUAL INTELLIGENCE A APERTURE Studio Personal workspa",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "APERTURE — Visual Intelligence",
+      "hasCanvas": false,
+      "bodyTextLen": 1299,
+      "bodyTextHash": "2d2d9d8afa9f61bf9e0ad15db09b00e33212fb2f087a06f58286c2a2acce3f46",
+      "bodyTextPrefix": "APERTURE® VISUAL INTELLIGENCE A APERTURE Studio Personal workspa",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-built.json",
+  "divergesFromBaseline": false,
+  "baselineReasons": []
+}
