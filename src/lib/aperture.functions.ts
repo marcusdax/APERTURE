@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { redactSceneZeroPii } from "./masternex-aperture-shield";
 
 export type Finding = {
   id: number;
@@ -196,14 +197,20 @@ ${data.imageDataUrl ? "A residential photograph is attached. Ground every findin
       messages: [{ role: "user", content }],
     });
     const [detections, textHits] = await Promise.all([detected, transcribed]);
+    const shieldAudit = redactSceneZeroPii(data.prompt || "", detections, textHits);
     if (!result.ok) {
       return {
         ok: false as const,
         error: result.error,
         findings: [] as Finding[],
         summary: "",
-        detections,
-        textHits,
+        detections: shieldAudit.redactedDetections,
+        textHits: shieldAudit.redactedTextHits,
+        masternexShield: {
+          allowed: shieldAudit.firewall.allowed,
+          merkleRootHash: shieldAudit.merkleRootHash,
+          auditReceiptHash: shieldAudit.auditReceiptHash,
+        },
       };
     }
     const text =
@@ -216,8 +223,13 @@ ${data.imageDataUrl ? "A residential photograph is attached. Ground every findin
         error: "",
         findings: parsed.findings,
         summary: parsed.summary,
-        detections,
-        textHits,
+        detections: shieldAudit.redactedDetections,
+        textHits: shieldAudit.redactedTextHits,
+        masternexShield: {
+          allowed: shieldAudit.firewall.allowed,
+          merkleRootHash: shieldAudit.merkleRootHash,
+          auditReceiptHash: shieldAudit.auditReceiptHash,
+        },
       };
     } catch (error) {
       return {
